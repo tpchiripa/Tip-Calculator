@@ -9,7 +9,7 @@ all_waiters = main_waiters + deli_waiters
 runners = ["Ayabonga", "Tony", "Lusanda"]
 days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 
-st.title("💰 Tip Calculator App - South African Rand (ZAR)")
+st.title("💰 Tip Calculator App - Whatfood Group")
 
 st.write("## Select 2 Runners per day (Runner's tips come from 5% deduction from main waiters only)")
 
