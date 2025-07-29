@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 
 # Business data
-main_waiters = ["Louis", "Peggy", "Florence", "Mathabo", "Zamo", "Nadia"]
+main_waiters = ["Louis", "Peggy", "Florence", "Mathabo", "Zamo", "Nadia","Nosisi","Tony"]
 deli_waiters = ["Nathan", "Ken", "Admire", "Nicole", "Pretty","Cheslin","Lloyd"]
 all_waiters = main_waiters + deli_waiters
 
