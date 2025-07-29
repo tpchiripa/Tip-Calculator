@@ -3,7 +3,7 @@ import pandas as pd
 
 # Business data
 main_waiters = ["Louis", "Peggy", "Florence", "Mathabo", "Zamo", "Nadia"]
-deli_waiters = ["Nathan", "Ken", "Admire", "Nicole", "Pretty"]
+deli_waiters = ["Nathan", "Ken", "Admire", "Nicole", "Pretty","Cheslin","Lloyd"]
 all_waiters = main_waiters + deli_waiters
 
 runners = ["Ayabonga", "Tony", "Lusanda"]
