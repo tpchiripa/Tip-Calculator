@@ -6,7 +6,7 @@ main_waiters = ["Louis", "Peggy", "Florence", "Mathabo", "Zamo", "Nadia","Nosisi
 deli_waiters = ["Nathan", "Ken", "Admire", "Nicole", "Pretty","Cheslin","Lloyd"]
 all_waiters = main_waiters + deli_waiters
 
-runners = ["Ayabonga", "Tony", "Lusanda","Eddie"]
+runners = ["Ayabonga", "Tony", "Lusanda"]
 days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 
 st.title("💰 Tip Calculator App - Whatfood Group")
