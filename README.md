@@ -25,3 +25,7 @@ A simple, intuitive **Streamlit** web app for calculating and distributing weekl
 ```bash
 pip install streamlit pandas
 streamlit run tip_calculator.py
+
+## 📄 License
+
+This project is developed for internal use at **Whatfood Group** and is intended for educational or demonstration purposes only. Redistribution or commercial use is not permitted without written permission.
