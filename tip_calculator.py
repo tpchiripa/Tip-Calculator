@@ -96,8 +96,8 @@ if not st.session_state.all_data.empty:
     df_all = df_all.reset_index().rename(columns={"index": "Waiter"})
     df_all["Week"] = pd.to_datetime(df_all["Date"]).dt.isocalendar().week
 
-    # Group by Waiter + Week
-    weekly_summary = df_all.groupby(["Waiter", "Week"]).sum(numeric_only=True).drop(columns=["Date"])
+    # Group by Waiter + Week safely (avoids KeyError if 'Date' is missing)
+    weekly_summary = df_all.drop(columns=["Date"], errors="ignore").groupby(["Waiter", "Week"]).sum(numeric_only=True)
 
     st.dataframe(weekly_summary.style.format("{:.2f}"))
 
@@ -108,4 +108,15 @@ if not st.session_state.all_data.empty:
         csv_summary,
         file_name="weekly_summary_tips.csv",
         mime="text/csv"
+    )
+
+    # ---- BUTTON TO OPEN LIVE STREAMLIT APP ----
+    st.markdown(
+        """
+        <a href="https://share.streamlit.io/tpchiripa/Tip-Calculator/main/Tip_calculator.py" target="_blank">
+            <button style="background-color:#ff4b4b; color:white; border:none; padding:10px 20px; border-radius:10px; cursor:pointer;">
+                🚀 Open Live App
+            </button>
+        </a>
+        """, unsafe_allow_html=True
     )
