@@ -1,122 +1,160 @@
 import streamlit as st
 import pandas as pd
+import pdfplumber
+import re
 from datetime import date
 
-# GitHub Button
-st.markdown(
-    """
-    <a href="https://github.com/tpchiripa" target="_blank">
-        <button style="background-color:#4CAF50; color:white; border:none; padding:10px 20px; border-radius:10px; cursor:pointer;">
-            🌐 Visit My GitHub
-        </button>
-    </a>
-    """, unsafe_allow_html=True
+# -----------------------------
+# INITIALIZE STAFF DATABASE
+# -----------------------------
+if "staff_roles" not in st.session_state:
+    st.session_state.staff_roles = {
+        "Louis": "Main Waiter",
+        "Peggy": "Main Waiter",
+        "Florence": "Main Waiter",
+        "Nadia": "Main Waiter",
+        "Zamo": "Main Waiter",
+        "Nicole": "Deli Waiter",
+        "Ken": "Deli Waiter",
+        "Ayabonga": "Runner",
+        "Tony": "Runner"
+    }
+
+roles_list = [
+    "Main Waiter",
+    "Deli Waiter",
+    "Runner",
+    "Cleaner",
+    "Night Barista",
+    "Night Doorman"
+]
+
+# -----------------------------
+# STAFF MANAGEMENT UI
+# -----------------------------
+st.sidebar.header("👥 Staff Management")
+
+new_name = st.sidebar.text_input("Add Staff Name")
+new_role = st.sidebar.selectbox("Select Role", roles_list)
+
+if st.sidebar.button("➕ Add Staff"):
+    if new_name:
+        st.session_state.staff_roles[new_name] = new_role
+        st.sidebar.success(f"{new_name} added as {new_role}")
+
+# Remove staff
+remove_name = st.sidebar.selectbox("Remove Staff", list(st.session_state.staff_roles.keys()))
+if st.sidebar.button("❌ Remove Staff"):
+    del st.session_state.staff_roles[remove_name]
+    st.sidebar.success(f"{remove_name} removed")
+
+st.sidebar.write("### Current Staff")
+st.sidebar.dataframe(
+    pd.DataFrame.from_dict(st.session_state.staff_roles, orient="index", columns=["Role"])
 )
 
-# Business data
-main_waiters = ["Louis", "Peggy", "Florence", "Mathabo", "Zamo", "Nadia","Nosisi","Tony"]
-deli_waiters = ["Nathan", "Ken", "Admire", "Nicole", "Pretty","Cheslin","Lloyd"]
-all_waiters = main_waiters + deli_waiters
-runners = ["Ayabonga", "Tony", "Lusanda"]
+# -----------------------------
+# FUNCTIONS
+# -----------------------------
+def extract_tips_from_pdf(pdf_file):
+    text = ""
+    with pdfplumber.open(pdf_file) as pdf:
+        for page in pdf.pages:
+            text += page.extract_text()
 
-st.title("💰 Interactive Tip Calculator App - Whatfood Group")
+    sections = text.split("Report for:")
+    data = []
 
-# Initialize session state storage
-if "all_data" not in st.session_state:
-    st.session_state.all_data = pd.DataFrame()
+    for section in sections[1:]:
+        try:
+            name = section.split("\n")[0].strip()
 
-# Select date
+            net_match = re.search(r"Net result \(Takings\).*?ZAR([\d,]+\.\d+)", section, re.DOTALL)
+            net = float(net_match.group(1).replace(",", "")) if net_match else 0
+
+            grat_match = re.search(r"Net result \(Takings\).*?Plus\s+gratuity\s+([\d,]+\.\d+)", section, re.DOTALL)
+            gratuity = float(grat_match.group(1).replace(",", "")) if grat_match else 0
+
+            total = net + gratuity
+
+            data.append({
+                "Waiter": name,
+                "Total_Tips": total
+            })
+
+        except:
+            continue
+
+    return pd.DataFrame(data)
+
+
+def apply_tip_logic(df, runners_selected):
+    df = df.copy()
+    staff_roles = st.session_state.staff_roles
+
+    df = df.set_index("Waiter")
+
+    # Ensure all staff are included
+    for name in staff_roles:
+        if name not in df.index:
+            df.loc[name] = 0
+
+    df["Role"] = df.index.map(staff_roles)
+
+    # Deduct 5% only from Main Waiters
+    df["Deduction"] = df.apply(
+        lambda x: x["Total_Tips"] * 0.05 if x["Role"] == "Main Waiter" else 0,
+        axis=1
+    )
+
+    total_pool = df["Deduction"].sum()
+
+    df["Final_Tips"] = df["Total_Tips"] - df["Deduction"]
+
+    # Runner allocation
+    runner_df = pd.DataFrame(index=runners_selected, columns=["Final_Tips"])
+    runner_df["Final_Tips"] = 0.0
+
+    if len(runners_selected) > 0:
+        share = total_pool / len(runners_selected)
+        runner_df["Final_Tips"] = share
+
+    final_df = pd.concat([df[["Final_Tips"]], runner_df])
+
+    return final_df
+
+
+# -----------------------------
+# MAIN UI
+# -----------------------------
+st.title("💰 Automated Tip System – Whatfood Group")
+
+uploaded_file = st.file_uploader("📥 Upload Lightspeed PDF", type="pdf")
 selected_date = st.date_input("Select date:", date.today())
 
-# Select runners (allow 1–3)
-runners_selected = st.multiselect(f"Runners on {selected_date} (Choose 1 to 3):", runners)
-if not (1 <= len(runners_selected) <= 3):
-    st.warning("Please select between 1 and 3 runners.")
+# Get runners dynamically
+runners_list = [name for name, role in st.session_state.staff_roles.items() if role == "Runner"]
 
-# Enter tips for each waiter
-st.write(f"## Enter tips for {selected_date}")
-tips_data = {}
-for waiter in all_waiters:
-    tips_data[waiter] = st.number_input(
-        f"Tips for {waiter} (R):", 
-        min_value=0.0, step=0.01, key=f"{waiter}_{selected_date}"
-    )
+runners_selected = st.multiselect("Select runners:", runners_list)
 
-if st.button("💾 Save Day's Tips"):
-    df = pd.DataFrame(tips_data, index=[selected_date]).T
-    df.index.name = "Waiter"
-    
-    # Deduct 5% from main waiters only
-    deductions = {waiter: df.at[waiter, selected_date]*0.05 for waiter in main_waiters}
-    total_deduction = sum(deductions.values())
+if uploaded_file and st.button("🚀 Process Tips"):
 
-    # Net tips
-    net_tips = df.copy()
-    for waiter in main_waiters:
-        net_tips.at[waiter, selected_date] -= deductions[waiter]
+    extracted_df = extract_tips_from_pdf(uploaded_file)
 
-    # Split runner share
-    runner_earnings = {}
-    if 1 <= len(runners_selected) <= 3:
-        share = total_deduction / len(runners_selected)
-        for r in runners_selected:
-            runner_earnings[r] = share
-    else:
-        runner_earnings = {r: 0.0 for r in runners}
+    st.write("### 🔍 Extracted Data")
+    st.dataframe(extracted_df)
 
-    # Combine results
-    results = net_tips.copy()
-    for r in runners:
-        results.loc[r] = [runner_earnings.get(r, 0.0)]
+    final_df = apply_tip_logic(extracted_df, runners_selected)
 
-    # Add this day’s data to session state
-    results["Date"] = selected_date
-    st.session_state.all_data = pd.concat([st.session_state.all_data, results])
+    final_df["Date"] = selected_date
 
-    st.success(f"Saved tips for {selected_date} ✅")
+    st.write("### 💸 Final Distribution")
+    st.dataframe(final_df.style.format("{:.2f}"))
 
-# Show all saved data
-if not st.session_state.all_data.empty:
-    st.write("### 📊 All Saved Tip Records (Daily)")
-    st.dataframe(st.session_state.all_data.style.format("{:.2f}"))
-
-    # Export daily records
-    csv_daily = st.session_state.all_data.reset_index().to_csv(index=False)
+    csv = final_df.reset_index().to_csv(index=False)
     st.download_button(
-        "📥 Download All Daily Records",
-        csv_daily,
-        file_name="all_tip_records.csv",
+        "📥 Download Results",
+        csv,
+        file_name=f"tips_{selected_date}.csv",
         mime="text/csv"
-    )
-
-    # ---- WEEKLY SUMMARY VIEW ----
-    st.write("### 📈 Weekly Summary of Tips per Waiter/Runner")
-
-    df_all = st.session_state.all_data.copy()
-    df_all = df_all.reset_index().rename(columns={"index": "Waiter"})
-    df_all["Week"] = pd.to_datetime(df_all["Date"]).dt.isocalendar().week
-
-    # Group by Waiter + Week safely (avoids KeyError if 'Date' is missing)
-    weekly_summary = df_all.drop(columns=["Date"], errors="ignore").groupby(["Waiter", "Week"]).sum(numeric_only=True)
-
-    st.dataframe(weekly_summary.style.format("{:.2f}"))
-
-    # Export weekly summary
-    csv_summary = weekly_summary.reset_index().to_csv(index=False)
-    st.download_button(
-        "📥 Download Weekly Summary",
-        csv_summary,
-        file_name="weekly_summary_tips.csv",
-        mime="text/csv"
-    )
-
-    # ---- BUTTON TO OPEN LIVE STREAMLIT APP ----
-    st.markdown(
-        """
-        <a href="https://share.streamlit.io/tpchiripa/Tip-Calculator/main/Tip_calculator.py" target="_blank">
-            <button style="background-color:#ff4b4b; color:white; border:none; padding:10px 20px; border-radius:10px; cursor:pointer;">
-                🚀 Open Live App
-            </button>
-        </a>
-        """, unsafe_allow_html=True
     )
